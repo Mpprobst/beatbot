@@ -11,7 +11,7 @@ import os
 from os import listdir
 from os.path import isfile, join
 import mido
-from mido import MidiFile
+from mido import MidiFile, MidiTrack, Message, MetaMessage
 from math import floor
 from math import ceil
 import numpy as np
@@ -97,16 +97,31 @@ def GetChord(notes):
 
     return f'{GetClefNote(root)}{"j" if isMajor else "i"}'
 
+# encodes a chord into a distinct integer
+# chordstring: first char is chord letter, second is minor or major indicator
+def EncodeChord(chordstring):
+    # encode note
+    notenum = 0
+    for j in range(len(TREBEL_NOTES)):
+        if TREBEL_NOTES[j]==chordstring[0]:
+            notenum=j
+            break
+
+    if chordstring[1]=='i':
+        notenum+=12
+
+    return notenum
+
 # file: midi file to be processed.
 # granularity: level of detail of the rhythm pattern (ex: 16th notes). always a factor of 2
 # rhythm_only: if False, the chords which are played will be determined.
-# returns: 2 arrays of length granularity * NUM_MEASURES. TODO: may need condense to array of tuples.
+# returns: 2D array of length granularity * NUM_MEASURES. TODO: may need condense to array of tuples.
 #   1) Note played for each granularity note in the midi
 #   2) Rhythm pattern for each granularity note in the midi
 # TODO: if file was not fully read, consider indicating so.
 def ProcessMidi(file, granularity=16, rhythm_only=False):
     midi = MidiFile(file, clip=True)
-    midi_notes = ['--' for note in range(granularity*NUM_MEASURES)]
+    midi_notes = [0 for note in range(granularity*NUM_MEASURES)]
     midi_rhythm = [0 for note in range(granularity*NUM_MEASURES)]
     notes_on = [0 for note in range(MIDI_LENGTH)]
 
@@ -131,8 +146,8 @@ def ProcessMidi(file, granularity=16, rhythm_only=False):
                             if notes_on[j] == 1:
                                 keys_on.append(j)
 
-                        chord = GetChord(keys_on)
-                        for t in range(time_idx, time_idx+delta_time):
+                        chord = EncodeChord(GetChord(keys_on))
+                        for t in range(time_idx, min(time_idx+delta_time, len(midi_notes))):
                             midi_notes[t] = chord
                     #endif
 
@@ -158,24 +173,63 @@ def ProcessMidi(file, granularity=16, rhythm_only=False):
 # drum_1: array describing accompanying slower drum pattern (ex: kick drum, snare)
 # drum_2: array describing accompanying consistent drum pattern (ex: high-hats)
 #   consistent meaning most of the notes occur in a very repeatable pattern (ex: all quarter notes)
-def ConcatMidiDatas(lead_notes, lead_rhythm, drum_1, drum_2, granularity=16):
-    image = np.zeros((1, 4, len(lead_notes), 1)) # describe with variables
-    for i in range(len(lead_notes)):
-        # encode note
-        notenum = 0
-        for j in range(len(TREBEL_NOTES)):
-            if TREBEL_NOTES[j]==lead_notes[i][0]:
-                notenum=j
-                break
-
-        if lead_notes[i][1]=='i':
-            notenum+=12
-
-        image[0][0][i]=notenum
-        image[0][1][i]=lead_rhythm[i]
-        image[0][2][i]=drum_1[i]
-        image[0][3][i]=drum_2[i]
-#endfor
+def ConcatMidiDatas(first, second):
+    image = np.zeros((1, 2, len(first), 1)) # describe with variables
+    for i in range(len(first)):
+        image[0][0][i]=first[i]
+        image[0][1][i]=second[i]
+        #image[0][2][i]=drum_1[i]
+        #image[0][3][i]=drum_2[i]
+    #endfor
     return image
 
 # TODO: add a print function to show the notes at a certain granularity
+
+def GetTempo(midi):
+    for msg in midi.tracks[0]:
+        if msg.type == 'set_tempo':
+            return msg.tempo
+
+    return 50000
+
+def GetTimeSig(midi):
+    for msg in midi.tracks[0]:
+        if msg.type == 'time_signature':
+            return msg.numerator, msg.denominator
+
+    return 4, 4
+
+def GetTicksPerBeat(midi):
+    for msg in midi.tracks[0]:
+        if msg.type == 1:
+            return msg.value
+
+    return 96
+
+
+def CreateMidi(data, tracks, path, tik=96, tempo=50000, ts=(4,4), granularity=16):
+    track_len = int(len(data) / tracks)
+    notes = [36, 42]
+    thresh = [0.5, 0.4]    # be more permissive with high hats
+    for i in range(tracks):
+        mid = MidiFile(ticks_per_beat=tik)
+        meta = MidiTrack()
+        meta.append(MetaMessage('set_tempo', tempo=tempo, time=0))
+        meta.append(MetaMessage('time_signature', numerator=ts[0], denominator=ts[1], clocks_per_click=24))
+        mid.tracks.append(meta)
+
+        track = MidiTrack()
+        mid.tracks.append(track)
+
+        note = notes[i]
+        note_len = int(24 * (16/granularity))
+        for j in range(track_len):
+            print(f'note[{j}]={data[j]}')
+            if data[j+i*track_len] < thresh[i]:
+                track.append(Message('note_off', note=note, velocity=64, time=0))
+            else:
+                track.append(Message('note_on', note=note, velocity=64, time=0))
+            track.append(Message('note_off', note=note, velocity=64, time=note_len))
+
+
+        mid.save(f'{path}gen_{i+1}.mid')
