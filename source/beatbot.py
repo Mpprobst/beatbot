@@ -15,7 +15,7 @@ import mido
 
 # project files
 import agents
-from agents import lstm_agent
+from agents import lstm_agent, nn_agent
 import read_midi
 
 TRAIN_DIR = "../data/train"  # reminder: train is split into leads and drums
@@ -23,7 +23,7 @@ TEST_DIR = "../data/test"  # reminder: train is split into leads and drums
 OUT_DIR = "../output"
 GRANULARITY = 16
 NUM_MEASURES = 4
-EPOCHS = 100
+EPOCHS = 2
 
 lead_files = [join(f'{TRAIN_DIR}/leads/',f)
               for f in listdir(f'{TRAIN_DIR}/leads')
@@ -86,5 +86,5 @@ for i in range(len(testfiles)):
     tpb = read_midi.GetTicksPerBeat(lead_midi)
     tempo = read_midi.GetTempo(lead_midi)
     ts = read_midi.GetTimeSig(lead_midi)
-    print(out)
+    #print(out)
     read_midi.CreateMidi(out, 2, f'{dir}/', tpb, tempo, ts, GRANULARITY)

@@ -210,7 +210,7 @@ def GetTicksPerBeat(midi):
 def CreateMidi(data, tracks, path, tik=96, tempo=50000, ts=(4,4), granularity=16):
     track_len = int(len(data) / tracks)
     notes = [36, 42]
-    thresh = [0.5, 0.4]    # be more permissive with high hats
+    thresh = [0.1, 0.1]    # be more permissive with high hats
     for i in range(tracks):
         mid = MidiFile(ticks_per_beat=tik)
         meta = MidiTrack()
