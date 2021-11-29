@@ -10,7 +10,6 @@ from agents.models import nn as NN
 
 class NNAgent():
     def __init__(self, input_size, hidden_size):
-        # create the lstm
         self.hidden_size = hidden_size
         self.model = NN.NN(input_size, input_size)
         self.loss_function = nn.MSELoss()
