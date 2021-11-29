@@ -14,6 +14,7 @@ import torch
 import mido
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
+import argparse
 
 # project files
 import agents
@@ -25,8 +26,9 @@ TEST_DIR = "../data/test"  # reminder: train is split into leads and drums
 OUT_DIR = "../output"
 GRANULARITY = 16
 NUM_MEASURES = 4
-EPOCHS = 5
+EPOCHS = 100
 BATCH_SIZE = 1
+MODEL_TYPES = {"nn" : 0, "lstm" : 1}
 
 def pad_input(sequence, length):
     features = np.zeros((len(sequence), length), dtype=int)
@@ -35,6 +37,18 @@ def pad_input(sequence, length):
             features[ii, -len(review):] = np.array(review)[:length]
     return features
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, default = "nn", help='Define type of nn model (nn or lstm)')
+args = parser.parse_args()
+
+agent_type = 0
+if args.model in MODEL_TYPES.keys():
+    agent_type = MODEL_TYPES[args.model]
+else:
+    print(f'model type {args.model} invalid')
+    exit()
+
+print(f'model type {agent_type} : {args.model}')
 lead_files = [join(f'{TRAIN_DIR}/leads/',f)
               for f in listdir(f'{TRAIN_DIR}/leads')
                 if isfile(join(f'{TRAIN_DIR}/leads/', f))
@@ -87,58 +101,64 @@ train_data = TensorDataset(train_data, train_lab)
 train_loader = DataLoader(train_data, batch_size=BATCH_SIZE)
 
 #train
-# need to be able to switch out methods of ML
-#agent = nn_agent.NNAgent(len(data[0][0]), 128)
-agent = lstm_agent.LSTMAgent(num_features, seq_len, 256)
+agent = None
+if agent_type == 0:
+    agent = nn_agent.NNAgent(len(train_data[0][0]), 128)
+elif agent_type == 1:
+    agent = lstm_agent.LSTMAgent(num_features, seq_len, 256)
+
 for e in range(EPOCHS):
     print(f'epoch: {e} loss: {agent.running_loss}')
-    h = agent.model.init_hidden(BATCH_SIZE)    #lstm only
+    if agent_type == 1:
+        h = agent.model.init_hidden(BATCH_SIZE)    #lstm only
     for dat, lab in train_loader:
         #print(f'data: {dat.size()}{dat}')
-        #agent.train(dat[0], dat[1])    #nn
-        agent.train(dat, lab, h)        #lstm
+        if agent_type == 0:             #nn
+            agent.train(dat, lab)
+        elif agent_type == 1:           #lstm
+            agent.train(dat, lab, h)
 
 # saving the trained model
 #agent.save(OUT_DIR)
 
 # test
-agent.model.eval()  #lstm only?
-h = agent.model.init_hidden(BATCH_SIZE)
+if agent_type == 1:
+    agent.model.eval()  #lstm only?
+    h = agent.model.init_hidden(BATCH_SIZE)
 batch = []
 for i in range(len(test_files)):
     test_notes, test_rhythm = read_midi.ProcessMidi(test_files[i], GRANULARITY)
     test = test_notes + test_rhythm
-# NN
-    out = agent.test(test)
-    dir = join(OUT_DIR, f'test_{i}')
-    if not isdir(dir):
-        os.mkdir(dir)
-    copyfile(testfiles[i], join(dir, os.path.basename(testfiles[i])))
+    if agent_type == 0:
+        out = agent.test(test)
+        dir = join(OUT_DIR, f'test_{i}')
+        if not isdir(dir):
+            os.mkdir(dir)
+        copyfile(test_files[i], join(dir, os.path.basename(test_files[i])))
 
-    lead_midi = mido.MidiFile(testfiles[i])
-    tpb = read_midi.GetTicksPerBeat(lead_midi)
-    tempo = read_midi.GetTempo(lead_midi)
-    ts = read_midi.GetTimeSig(lead_midi)
-    #print(out)
-    read_midi.CreateMidi(out, 2, f'{dir}/', tpb, tempo, ts, GRANULARITY)
-# LSTM
-    batch.append(test)
+        lead_midi = mido.MidiFile(test_files[i])
+        tpb = read_midi.GetTicksPerBeat(lead_midi)
+        tempo = read_midi.GetTempo(lead_midi)
+        ts = read_midi.GetTimeSig(lead_midi)
+        #print(out)
+        read_midi.CreateMidi(out, 2, f'{dir}/', tpb, tempo, ts, GRANULARITY)
+    elif agent_type == 1:
+        batch.append(test)
+        if len(batch) >= BATCH_SIZE:
+            #out = agent.test(test)
+            batch = np.array(batch)
+            out, h = agent.test(batch, h)
 
-    if len(batch) >= BATCH_SIZE:
-        #out = agent.test(test)
-        batch = np.array(batch)
-        out, h = agent.test(batch, h)
+            for j in range(BATCH_SIZE):
+                dir = join(OUT_DIR, f'test_{i+j}')
+                if not isdir(dir):
+                    os.mkdir(dir)
+                copyfile(test_files[i+j], join(dir, os.path.basename(test_files[i+j])))
 
-        for j in range(BATCH_SIZE):
-            dir = join(OUT_DIR, f'test_{i+j}')
-            if not isdir(dir):
-                os.mkdir(dir)
-            copyfile(test_files[i+j], join(dir, os.path.basename(test_files[i+j])))
+                lead_midi = mido.MidiFile(test_files[i+j])
+                tpb = read_midi.GetTicksPerBeat(lead_midi)
+                tempo = read_midi.GetTempo(lead_midi)
+                ts = read_midi.GetTimeSig(lead_midi)
+                read_midi.CreateMidi(out[j], 2, f'{dir}/', tpb, tempo, ts, GRANULARITY)
 
-            lead_midi = mido.MidiFile(test_files[i+j])
-            tpb = read_midi.GetTicksPerBeat(lead_midi)
-            tempo = read_midi.GetTempo(lead_midi)
-            ts = read_midi.GetTimeSig(lead_midi)
-            read_midi.CreateMidi(out[j], 2, f'{dir}/', tpb, tempo, ts, GRANULARITY)
-
-        batch = []
+            batch = []

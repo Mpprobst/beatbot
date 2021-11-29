@@ -224,7 +224,7 @@ def CreateMidi(data, tracks, path, tik=96, tempo=50000, ts=(4,4), granularity=16
         note = notes[i]
         note_len = int(24 * (16/granularity))
         for j in range(track_len):
-            print(f'note[{j}]={data[j]}')
+            #print(f'note[{j}]={data[j]}')
             if data[j+i*track_len] < 0.1:#thresh[i]:
                 track.append(Message('note_off', note=note, velocity=64, time=0))
             else:
