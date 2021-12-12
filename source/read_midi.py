@@ -121,6 +121,7 @@ def EncodeChord(chordstring):
 # TODO: if file was not fully read, consider indicating so.
 def ProcessMidi(file, granularity=16, rhythm_only=False):
     midi = MidiFile(file, clip=True)
+    print(f'FILE: {file}\n{midi}')
     midi_notes = [0 for note in range(granularity*NUM_MEASURES)]
     midi_rhythm = [0 for note in range(granularity*NUM_MEASURES)]
     notes_on = [0 for note in range(MIDI_LENGTH)]
@@ -210,7 +211,7 @@ def GetTicksPerBeat(midi):
 def CreateMidi(data, tracks, path, tik=96, tempo=50000, ts=(4,4), granularity=16):
     track_len = int(len(data) / tracks)
     notes = [36, 42]
-    thresh = [0.1, 0.1]    # be more permissive with high hats
+    thresh = [0.40, 0.25]    # be more permissive with high hats
     for i in range(tracks):
         mid = MidiFile(ticks_per_beat=tik)
         meta = MidiTrack()
@@ -224,8 +225,8 @@ def CreateMidi(data, tracks, path, tik=96, tempo=50000, ts=(4,4), granularity=16
         note = notes[i]
         note_len = int(24 * (16/granularity))
         for j in range(track_len):
-            #print(f'note[{j}]={data[j]}')
-            if data[j+i*track_len] < 0.1:#thresh[i]:
+            print(f'note[{j}]={data[j]}')
+            if data[j+i*track_len] < thresh[i]:
                 track.append(Message('note_off', note=note, velocity=64, time=0))
             else:
                 track.append(Message('note_on', note=note, velocity=64, time=0))

@@ -41,11 +41,11 @@ class LSTM(nn.Module):
         out = self.dropout(lstm_out)
         out = self.fc(out)
         out = self.sigmoid(out)
-        print(f'before view: {out.size()}')
+        #print(f'before view: {out.size()}')
         out = out.view(batch_size, self.dim_output, -1)
-        print(f'after view: {out.size()}')
-        out = out[0][:,-1]
-        print(f'after trunc: {out.size()}')
+        #print(f'after view: {out[0].size()} {out[0]}')
+        out = out[:,-1]
+        #print(f'final out: {out.size()}\n')
         return out, hidden
 
     def init_hidden(self, batch_size):

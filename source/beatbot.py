@@ -26,8 +26,8 @@ TEST_DIR = "../data/test"  # reminder: train is split into leads and drums
 OUT_DIR = "../output"
 GRANULARITY = 16
 NUM_MEASURES = 4
-EPOCHS = 100
-BATCH_SIZE = 1
+EPOCHS = 50  #100 is good for nn
+BATCH_SIZE = 2
 MODEL_TYPES = {"nn" : 0, "lstm" : 1}
 
 def pad_input(sequence, length):
@@ -76,7 +76,7 @@ train_data = []
 train_lab = []
 test_data = []
 
-num_features = 24
+num_features = 300
 seq_len = 0
 
 # prepare data
@@ -105,7 +105,7 @@ agent = None
 if agent_type == 0:
     agent = nn_agent.NNAgent(len(train_data[0][0]), 128)
 elif agent_type == 1:
-    agent = lstm_agent.LSTMAgent(num_features, seq_len, 256)
+    agent = lstm_agent.LSTMAgent(num_features, seq_len, 64)
 
 for e in range(EPOCHS):
     print(f'epoch: {e} loss: {agent.running_loss}')
@@ -126,6 +126,7 @@ if agent_type == 1:
     agent.model.eval()  #lstm only?
     h = agent.model.init_hidden(BATCH_SIZE)
 batch = []
+file_no = 0
 for i in range(len(test_files)):
     test_notes, test_rhythm = read_midi.ProcessMidi(test_files[i], GRANULARITY)
     test = test_notes + test_rhythm
@@ -150,15 +151,16 @@ for i in range(len(test_files)):
             out, h = agent.test(batch, h)
 
             for j in range(BATCH_SIZE):
-                dir = join(OUT_DIR, f'test_{i+j}')
+                dir = join(OUT_DIR, f'test_{file_no}')
                 if not isdir(dir):
                     os.mkdir(dir)
-                copyfile(test_files[i+j], join(dir, os.path.basename(test_files[i+j])))
+                copyfile(test_files[file_no], join(dir, os.path.basename(test_files[file_no])))
 
-                lead_midi = mido.MidiFile(test_files[i+j])
+                lead_midi = mido.MidiFile(test_files[file_no])
                 tpb = read_midi.GetTicksPerBeat(lead_midi)
                 tempo = read_midi.GetTempo(lead_midi)
                 ts = read_midi.GetTimeSig(lead_midi)
+                print(f'Creating {file_no}')
                 read_midi.CreateMidi(out[j], 2, f'{dir}/', tpb, tempo, ts, GRANULARITY)
-
+                file_no += 1
             batch = []

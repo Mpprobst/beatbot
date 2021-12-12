@@ -16,46 +16,65 @@ class LSTMAgent():
         self.hidden_size = hidden_size
         self.chunk_size = 4     # number of notes to feed at once
         self.output_size = output_size
-        self.model = lstm.LSTM(input_size, self.chunk_size, hidden_size, 2)
+        self.model = lstm.LSTM(input_size, self.chunk_size, hidden_size, 3)
         self.loss_function = nn.BCELoss()
-        self.optimizer = T.optim.Adam(self.model.parameters(), lr=0.15)
+        self.optimizer = T.optim.Adam(self.model.parameters(), lr=0.05)
         self.running_loss = 0
 
     def train(self, data, target, h):
         # feed a few notes at a time
-        T.autograd.set_detect_anomaly(True)
         h = tuple([e.data for e in h])
-        #print(h)
-        #print(f'size of data, tar: {data[0]}, {target.size()}')
+        losses = []
+        batch_size = data.size(0)
+        # feed in only a few notes at a time
         for i in range(0, len(data[0]), self.chunk_size):
-            #print(f'[{data[0][i]}, {data[0][i+1]}, {data[0][i+2]}, {data[0][i+3]}], {data[0][i:i+4]}')
-            d_chunk = np.zeros((1, self.chunk_size))
-            d_chunk[0] = data[0][i:i+self.chunk_size]
+            d_chunk = np.zeros((batch_size, self.chunk_size))
+            t_chunk = np.zeros((batch_size, self.chunk_size))
+
+            for j in range(batch_size):
+                d_chunk[j] = data[j][i:i+self.chunk_size]
+                t_chunk[j] = target[j][i:i+self.chunk_size]
+
             d_chunk = T.tensor(d_chunk).float().to(self.model.device)
-            t_chunk = np.zeros((1, self.chunk_size))
-            t_chunk = target[0][i:i+self.chunk_size]
             t_chunk = T.tensor(t_chunk).float().to(self.model.device)
 
-            self.optimizer.zero_grad()
             #print(f'd_chunk = {d_chunk.size()} h = {h[0].size()}, {h[1].size()}')
             out, h = self.model(d_chunk, h)
             #print(f't_chunk = {t_chunk.size()} out size = {out.size()}')
             loss = self.loss_function(out, t_chunk)
-            loss.backward()
-            self.optimizer.step()
+            losses.append(loss)
 
-            self.running_loss += loss
+        self.optimizer.zero_grad()
+        loss = T.mean(T.stack(losses))
+        loss.backward()
+        self.optimizer.step()
+        self.running_loss += loss
 
     def test(self, data, hidden):
         hidden = tuple([e.data for e in hidden])
         data = T.tensor(data).float().to(self.model.device)
-        o = []
-        h = []
-        for i in range(0, len(data), self.chunk_size):
-            out, hid = self.model(chunk, hidden)
-            o.append(out)
-            h.append(hid)
+        batch_size = len(data)
+        o = np.zeros((batch_size, len(data[0])))
+        h = None
+        print("\nDEBUG-test")
+        print(f'data size: {data.size()}, batch={batch_size}, len={len(data[0])}')
+        for i in range(0, len(data[0]), self.chunk_size):
+            d_chunk = np.zeros((batch_size, self.chunk_size))
+            for j in range(batch_size):
+                d_chunk[j] = data[j][i:i+self.chunk_size]
+            d_chunk = T.tensor(d_chunk).float().to(self.model.device)
+
+            out, hid = self.model(d_chunk, hidden)
+            #print(f'chunk out: {out.size()}')
+            out = out.detach().numpy()
+            #print(f'out: {out}')
+            for j in range(batch_size):
+                for k in range(self.chunk_size):
+                    o[j][i+k] = out[j][k]
+            h = hid
         #out, h = self.model(data, h)
+        #print(f'test out:{o}')
+        # o should be [batchsize, notes]
         return o, h
 
     def save(self, path):
