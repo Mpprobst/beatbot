@@ -14,7 +14,7 @@ class LSTMAgent():
     def __init__(self, input_size, output_size, hidden_size):
         # create the lstm
         self.hidden_size = hidden_size
-        self.chunk_size = 4     # number of notes to feed at once
+        self.chunk_size = 8     # number of notes to feed at once
         self.output_size = output_size
         self.model = lstm.LSTM(input_size, self.chunk_size, hidden_size, 3)
         self.loss_function = nn.BCELoss()
@@ -56,8 +56,8 @@ class LSTMAgent():
         batch_size = len(data)
         o = np.zeros((batch_size, len(data[0])))
         h = None
-        print("\nDEBUG-test")
-        print(f'data size: {data.size()}, batch={batch_size}, len={len(data[0])}')
+        #print("\nDEBUG-test")
+        #print(f'data size: {data.size()}, batch={batch_size}, len={len(data[0])}')
         for i in range(0, len(data[0]), self.chunk_size):
             d_chunk = np.zeros((batch_size, self.chunk_size))
             for j in range(batch_size):

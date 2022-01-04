@@ -26,7 +26,7 @@ TEST_DIR = "../data/test"  # reminder: train is split into leads and drums
 OUT_DIR = "../output"
 GRANULARITY = 16
 NUM_MEASURES = 4
-EPOCHS = 50  #100 is good for nn
+EPOCHS = 25  #100 is good for nn
 BATCH_SIZE = 2
 MODEL_TYPES = {"nn" : 0, "lstm" : 1}
 
@@ -51,7 +51,7 @@ else:
 print(f'model type {agent_type} : {args.model}')
 lead_files = [join(f'{TRAIN_DIR}/leads/',f)
               for f in listdir(f'{TRAIN_DIR}/leads')
-                if isfile(join(f'{TRAIN_DIR}/leads/', f))
+                if isfile(join(f'{TRAIN_DIR}/leads/', f)) & f.endswith('.mid')
              ]
 drum_folders = [join(f'{TRAIN_DIR}/drums/',f)
                 for f in listdir(f'{TRAIN_DIR}/drums')
@@ -59,8 +59,12 @@ drum_folders = [join(f'{TRAIN_DIR}/drums/',f)
                ]
 test_files = [join(f'{TEST_DIR}/',f)
               for f in listdir(f'{TEST_DIR}')
-                if isfile(join(f'{TEST_DIR}/', f))
+                if isfile(join(f'{TEST_DIR}/', f)) & f.endswith('.mid')
              ]
+
+lead_files.sort()
+drum_folders.sort()
+test_files.sort()
 # Array of tuples containig both drum files.
 # Using 2 drum files because in practice, drum patterns are split into several
 # instrumensts/tracks
@@ -68,8 +72,9 @@ drum_files = []
 for folder in drum_folders:
     files = [join(f'{folder}/',f)
              for f in listdir(f'{folder}/')
-                if isfile(join(f'{folder}/',f))
+                if isfile(join(f'{folder}/',f)) & f.endswith('.mid')
             ]
+    files.sort()
     drum_files.append(files)
 
 train_data = []
@@ -78,7 +83,6 @@ test_data = []
 
 num_features = 300
 seq_len = 0
-
 # prepare data
 for i in range(len(lead_files)):
     lead_notes, lead_rhythm = read_midi.ProcessMidi(lead_files[i], GRANULARITY)
@@ -160,7 +164,7 @@ for i in range(len(test_files)):
                 tpb = read_midi.GetTicksPerBeat(lead_midi)
                 tempo = read_midi.GetTempo(lead_midi)
                 ts = read_midi.GetTimeSig(lead_midi)
-                print(f'Creating {file_no}')
+                #print(f'Creating {file_no}')
                 read_midi.CreateMidi(out[j], 2, f'{dir}/', tpb, tempo, ts, GRANULARITY)
                 file_no += 1
             batch = []

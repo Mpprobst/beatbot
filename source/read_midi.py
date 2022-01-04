@@ -120,8 +120,8 @@ def EncodeChord(chordstring):
 #   2) Rhythm pattern for each granularity note in the midi
 # TODO: if file was not fully read, consider indicating so.
 def ProcessMidi(file, granularity=16, rhythm_only=False):
+    print(f'FILE: {file}')
     midi = MidiFile(file, clip=True)
-    print(f'FILE: {file}\n{midi}')
     midi_notes = [0 for note in range(granularity*NUM_MEASURES)]
     midi_rhythm = [0 for note in range(granularity*NUM_MEASURES)]
     notes_on = [0 for note in range(MIDI_LENGTH)]
@@ -211,7 +211,8 @@ def GetTicksPerBeat(midi):
 def CreateMidi(data, tracks, path, tik=96, tempo=50000, ts=(4,4), granularity=16):
     track_len = int(len(data) / tracks)
     notes = [36, 42]
-    thresh = [0.40, 0.25]    # be more permissive with high hats
+    #thresh = [0.40, 0.25]    # be more permissive with high hats - for nn
+    thresh = [0.35, 0.3]    # for lstm
     for i in range(tracks):
         mid = MidiFile(ticks_per_beat=tik)
         meta = MidiTrack()
