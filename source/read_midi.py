@@ -122,8 +122,9 @@ def EncodeChord(chordstring):
 def ProcessMidi(file, granularity=16, rhythm_only=False):
     print(f'FILE: {file}')
     midi = MidiFile(file, clip=True)
-    midi_notes = [0 for note in range(granularity*NUM_MEASURES)]
+    midi_chords = [0 for note in range(granularity*NUM_MEASURES)]
     midi_rhythm = [0 for note in range(granularity*NUM_MEASURES)]
+    midi_notes = [[] for note in range(granularity*NUM_MEASURES)]
     notes_on = [0 for note in range(MIDI_LENGTH)]
 
     midi_clk = 24   # TODO: get this from the meta message. standard is 24
@@ -132,10 +133,10 @@ def ProcessMidi(file, granularity=16, rhythm_only=False):
         time_idx = 0
         rhythm = 0
         for msg in track:
-            if time_idx >= len(midi_notes):
+            if time_idx >= len(midi_chords):
                 break
             if msg.type == 'note_on' or msg.type == 'note_off':
-                # if delta time > 0 we have advanced time
+                # if msg.time is time since last message. if > 0 we have advanced time
                 if int(msg.time) >= pat_clk:
                     # THIS WORKS FOR 16th NOTES ONLY
                     delta_time = ceil(msg.time / pat_clk)
@@ -148,8 +149,9 @@ def ProcessMidi(file, granularity=16, rhythm_only=False):
                                 keys_on.append(j)
 
                         chord = EncodeChord(GetChord(keys_on))
-                        for t in range(time_idx, min(time_idx+delta_time, len(midi_notes))):
-                            midi_notes[t] = chord
+                        for t in range(time_idx, min(time_idx+delta_time, len(midi_chords))):
+                            midi_chords[t] = chord
+                            midi_notes[t] = keys_on
                     #endif
 
                     midi_rhythm[time_idx] = rhythm
@@ -166,7 +168,7 @@ def ProcessMidi(file, granularity=16, rhythm_only=False):
             #endif
         #endfor
     #endfor
-    return midi_notes, midi_rhythm
+    return midi_chords, midi_rhythm, midi_notes
 
 # Concats processed midi arrays into a 2D image to use as input to a CNN
 # lead_notes: array of notes played for a midi file
