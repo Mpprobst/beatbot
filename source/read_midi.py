@@ -93,9 +93,9 @@ def GetChord(notes):
     #   otherwise it is a sharp. for now, we know if we see C# major, then this is really Db major.
     # endfor
     if root == -1:
-        return f'{GetClefNote(notes[len(notes)-1])}-'
+        return f'{GetClefNote(notes[len(notes)-1])}-', chord
 
-    return f'{GetClefNote(root)}{"j" if isMajor else "i"}'
+    return f'{GetClefNote(root)}{"j" if isMajor else "i"}', chord
 
 # encodes a chord into a distinct integer
 # chordstring: first char is chord letter, second is minor or major indicator
@@ -124,6 +124,7 @@ def ProcessMidi(file, granularity=16, rhythm_only=False):
     midi = MidiFile(file, clip=True)
     midi_chords = [0 for note in range(granularity*NUM_MEASURES)]
     midi_rhythm = [0 for note in range(granularity*NUM_MEASURES)]
+    midi_chord_notes = [[] for note in range(granularity*NUM_MEASURES)]
     midi_notes = [[] for note in range(granularity*NUM_MEASURES)]
     notes_on = [0 for note in range(MIDI_LENGTH)]
 
@@ -148,10 +149,22 @@ def ProcessMidi(file, granularity=16, rhythm_only=False):
                             if notes_on[j] == 1:
                                 keys_on.append(j)
 
-                        chord = EncodeChord(GetChord(keys_on))
+                        chord, chord_notes = GetChord(keys_on)
+                        #encoded = EncodeChord(chord)
+                        #chord = EncodeChord(GetChord(keys_on))
+                        bonus_notes = []
+                        for k in keys_on:
+                            if not isinstance(chord_notes[0], int):
+                                bonus_notes = keys_on
+                                break
+                            if k not in chord_notes:
+                                bonus_notes.append(k)
+
                         for t in range(time_idx, min(time_idx+delta_time, len(midi_chords))):
                             midi_chords[t] = chord
-                            midi_notes[t] = keys_on
+                            print(f'bon: {bonus_notes}')
+                            midi_notes[t] = bonus_notes
+                            midi_chord_notes[t] = chord_notes
                     #endif
 
                     midi_rhythm[time_idx] = rhythm
@@ -168,7 +181,7 @@ def ProcessMidi(file, granularity=16, rhythm_only=False):
             #endif
         #endfor
     #endfor
-    return midi_chords, midi_rhythm, midi_notes
+    return midi_chords, midi_rhythm, midi_chord_notes, midi_notes
 
 # Concats processed midi arrays into a 2D image to use as input to a CNN
 # lead_notes: array of notes played for a midi file
